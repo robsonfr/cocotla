@@ -3,9 +3,7 @@
     bra inicio   
     ; rotina para ler os dados
 c1:    
-    db $0a
-c2:
-    db $0a
+    db $05
 c3:
     db 0
 inicio: 
@@ -43,9 +41,6 @@ btt2:
     dec c3
     bne  btt2
     
-    ; ajusta para "modo rapido"
-    lda c2
-    sta c1
     ; x tem o endereco de destino
     ldx    #$400
 lop1:
