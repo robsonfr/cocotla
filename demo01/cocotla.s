@@ -1,8 +1,14 @@
-    org $2000
+    org $3000
       
-       
+    bra inicio   
     ; rotina para ler os dados
- 
+c1:    
+    db $0a
+c2:
+    db $0a
+c3:
+    db 0
+inicio: 
     ; agora vamos desabilitar IRQ e FIRQ...
     orcc #$50
  
@@ -13,25 +19,51 @@
     
     ldx #$0
 l2:    leax -1,x
-    bne l2
+    brn l2
 
+    
+lp3:
+    clrb
+    lda #8
+    sta c3
+; tem que ler ateh encontrar algo diferente de 55h
+btte:
+    bsr   lebit
+    rorb
+    dec c3
+    bne  btte
+    cmpb #$55
+    beq lp3
+
+    lda #8
+    sta c3
+btt2:
+    bsr   lebit
+    rorb
+    dec c3
+    bne  btt2
+    
+    ; ajusta para "modo rapido"
+    lda c2
+    sta c1
     ; x tem o endereco de destino
     ldx    #$400
 lop1:
+    stb ,x+
+    cmpx #$600
+    beq fim
     clrb
     lda  #8
-    
+    sta c3
     ; Le 8 bits para fazer 1 byte
 baite:
     bsr   lebit
     rorb
-    deca
-    bne  baite
+    dec c3
+    bne  baite    
     
-    stb, x+
-    cmpx #$600
-    bne lop1
-    
+    bra lop1
+fim:    
     ; no final vamos habilitar IRQ e FIRQ
     andcc #$a7
     ; e ligar o motor
@@ -46,21 +78,20 @@ lp1:
     ; le um bit, retorna em cc
     ; preserva a e b, destroi y
 lebit:
-    pshs a,b
+    pshs b
 
 baixo:
     ldb $ff20  ; 4
     rorb       ; 2
     bcc baixo
     
-    ldy #0
+    clra
 alto:
     ldb  $ff20    ; 4
-    leay 1,y
+    inca
     rorb      ; 2
     bcs alto ; 3
-    
-    puls b,a
-    cmpy #$0002 
+    puls b
+    cmpa c1   
     rts           
    

@@ -5,16 +5,19 @@ from struct import pack
 onda = [int(127.0 * math.sin(float(k) / 20.0 * math.pi)) for k in range(40)]
 onda_2 = [int(127.0 * math.sin(float(k) / 11.0 * math.pi)) for k in range(22)]
 
-onda_3 = [3,253]
-onda_4 = [253,3]
+onda_3 = [int(127.0 * math.sin(float(k) / 10.0 * math.pi)) for k in range(20)]
+onda_4 = [int(127.0 * math.sin(float(k) / 5.5 * math.pi)) for k in range(11)]
+
+#onda_3 = [3,253]
+#onda_4 = [253,3]
 
 #onda_3 = [int(32000.0 * math.sin(float(k) / 4.0 * math.pi)) for k in range(8)]
 #onda_4 = [int(32000.0 * math.sin(float(k) / 2.0 * math.pi)) for k in range(4)]
 onda_bytes = (bytearray(chain.from_iterable([pack("b",n) for n in onda])),
               bytearray(chain.from_iterable([pack("b",n) for n in onda_2])))
     
-onda_x = (bytearray(chain.from_iterable([pack("B",n)  for n in onda_3])),
-              bytearray(chain.from_iterable([pack("B",n) for n in onda_4])))
+onda_x = (bytearray(chain.from_iterable([pack("b",n)  for n in onda_3])),
+              bytearray(chain.from_iterable([pack("b",n) for n in onda_4])))
 
 onda_tipos = {True : onda_x, False : onda_bytes}              
               
@@ -131,7 +134,7 @@ with fn(saida,"wb") as s:
     if adiciona_teste:
         #s.llwrite(bytearray([0x01,0x80] * 882))
         #s.write(leader, True)
-        for _ in range(16):
-            s.write(bytearray([255]*32), True)
-
+        #for _ in range(16):
+        s.write(bytearray([n for n in range(256)]*2), True)
+        s.write(bytearray([55]), True)
     
