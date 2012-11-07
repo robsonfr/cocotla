@@ -7,6 +7,8 @@ onda_2 = [int(127.0 * math.sin(float(k) / 11.0 * math.pi)) for k in range(22)]
 
 onda_3 = [int(127.0 * math.sin(float(k) / 5.0 * math.pi)) for k in range(10)]
 onda_4 = [int(127.0 * math.sin(float(k) / 3.0 * math.pi)) for k in range(6)]
+#onda_3 = [0, -1, -1, 0, 0, 0]
+#onda_4 = [0, -1, 0, 0, 0, 0]
 
 #onda_3 = [3,253]
 #onda_4 = [253,3]
@@ -16,7 +18,7 @@ onda_4 = [int(127.0 * math.sin(float(k) / 3.0 * math.pi)) for k in range(6)]
 onda_bytes = (bytearray(chain.from_iterable([pack("b",n) for n in onda])),
               bytearray(chain.from_iterable([pack("b",n) for n in onda_2])))
     
-onda_x = (bytearray(chain.from_iterable([pack("b",n)  for n in onda_3])),
+onda_x = (bytearray(chain.from_iterable([pack("b",n) for n in onda_3])),
               bytearray(chain.from_iterable([pack("b",n) for n in onda_4])))
 
 onda_tipos = {True : onda_x, False : onda_bytes}              
@@ -31,11 +33,11 @@ class Cas2Wav(object):
     def __enter__(self):
         # Header
         self.__file.write(bytearray("RIFF") + bytearray([0]*4) + bytearray("WAVE"))
-        # 16,0,0,0: tamanho (PCM), 1,0 : formato (PCM), 1,0 : canais, 0x44,0xAC,0,0: taxa de amostragem (44100)
-        # 0x44,0xAC,0x00,0 : byte rate (taxa * num canais * bits por amostra / 8)
-        # 1,0 : alinhamento de bloco (num canais * bits por amostra  / 8)
+        # 16,0,0,0: tamanho (PCM), 1,0 : formato (PCM), 2,0 : canais, 0x44,0xAC,0,0: taxa de amostragem (44100)
+        # 0x10,0xB1,0x02,0 : byte rate (taxa * num canais * bits por amostra / 8)
+        # 4,0 : alinhamento de bloco (num canais * bits por amostra  / 8)
         # 8,0 : bits por amostra
-        self.__file.write(bytearray("fmt ") + bytearray([16,0,0,0,1,0,1,0, 0x44,0xAC,0,0,0x44,0xAC,0,0,1,0,8,0]))
+        self.__file.write(bytearray("fmt ") + bytearray([16,0,0,0,1,0,1,0, 0x44,0xAC,0,0,0x44,0xAC,0x00,0x00,1,0,8,0]))
         self.__file.write(bytearray("data") + bytearray([0]*4))
         self.__sc2s = 0
         return self
@@ -81,7 +83,7 @@ class Bloco(object):
 
 class BlocoArquivo(Bloco):
 #   def __init__(self, tipo, nome, ascii = False, staddr = 0x1F0B, ldaddr = 0x1F0B):
-    def __init__(self, tipo, nome, ascii = False, staddr = 0x3000, ldaddr = 0x3000):
+    def __init__(self, tipo, nome, ascii = False, staddr = 0x2000, ldaddr = 0x2000):
         Bloco.__init__(self, 0, bytearray(nome.upper()[:8] + " " * (max(0, 8-len(nome)))) + bytearray([tipo, {False: 0, True: 0xFF}[ascii], 0]) + bytearray(pack(">H",staddr)) + bytearray(pack(">H",ldaddr))) 
 
 class BlocoEOF(Bloco):
@@ -95,47 +97,48 @@ def grouper(n, iterable, fillvalue=None):
     args = [iter(iterable)] * n
     return izip_longest(fillvalue=fillvalue, *args)        
 
-    
-adiciona_teste = False
-if sys.argv[1] == "-w":
-    nome = sys.argv[2]
-    fn = cas_to_wav
-    saida = nome.replace(".rom",".wav")
-    adiciona_teste = True
-else:
-    nome = sys.argv[1]
-    fn = open
-    saida = nome.replace(".rom",".cas")      
-    
-nf = nome.replace(".rom","")
-print nome
-with open(nome,"rb") as arq:
-    dados = bytearray(arq.read())
-print len(dados)    
-leader = bytearray("U" * 128)
-l2 = bytearray(range(256)*2)
-q = len(dados) // 255
-u  = len(dados) % 255
-print q,u
-with fn(saida,"wb") as s:    
-    s.write(leader)
-    BlocoArquivo(2,nf).write(s)
-    s.write(leader)
-    if len(dados) < 255:
-        Bloco(1,dados).write(s)
+if __name__ == "__main__":
+    adiciona_teste = False
+    if sys.argv[1] == "-w":
+        nome = sys.argv[2]
+        fn = cas_to_wav
+        saida = nome.replace(".rom",".wav")
+        adiciona_teste = True
+        outro_arq = sys.argv[3]
     else:
-        a = 0
-        for b in grouper(255, dados):        
-            a = a + 1
-            if a == q: b = b[:u]
-            Bloco(1, b).write(s)
-            if a == q: break
-    BlocoEOF().write(s)
-    if adiciona_teste:
-        #s.llwrite(bytearray([0x01,0x80] * 882))
-        #s.write(leader, True)
-        #for _ in range(16):
-        s.write(bytearray([n for n in range(256)]*2), True)
-        #s.write(bytearray([255] * 512), True)
-        s.write(bytearray([55]), True)
-    
+        nome = sys.argv[1]
+        fn = open
+        saida = nome.replace(".rom",".cas")      
+        
+    nf = nome.replace(".rom","")
+    with open(nome,"rb") as arq:
+        dados = bytearray(arq.read())  
+    leader = bytearray("U" * 128)
+    l2 = bytearray(range(256)*2)
+    q = len(dados) // 255
+    u  = len(dados) % 255
+    with fn(saida,"wb") as s:    
+        s.write(leader)
+        BlocoArquivo(2,nf).write(s)
+        s.write(leader)
+        if len(dados) < 255:
+            Bloco(1,dados).write(s)
+        else:
+            a = 0
+            for b in grouper(255, dados):        
+                a = a + 1
+                if a == q: b = b[:u]
+                Bloco(1, b).write(s)
+                if a == q: break
+        BlocoEOF().write(s)
+        if adiciona_teste:
+            #s.llwrite(bytearray([0x01,0x80] * 882))
+            #s.write(leader, True)
+            #for _ in range(16):
+            with open(outro_arq, "rb") as oa:
+                df = bytearray(oa.read())
+            #s.write(bytearray([n for n in range(256)]*2), True)
+            #s.write(bytearray([255] * 512), True)
+            s.write(df, True)
+            s.write(bytearray([0,0,0]), True)
+        

@@ -1,9 +1,10 @@
-    org $3000
+    org $2000
       
     bra inicio   
     ; rotina para ler os dados
-c1:    
+c1:
     db $05
+;    db $03
 c3:
     db 0
 inicio: 
@@ -15,10 +16,6 @@ inicio:
     ora #$8
     sta $ff21
     
-    ldx #$0
-l2:    leax -1,x
-    brn l2
-
     
 lp3:
     clrb
@@ -42,11 +39,12 @@ btt2:
     bne  btt2
     
     ; x tem o endereco de destino
-    ldx    #$400
+    ldx    #$3000
 lop1:
     stb ,x+
-    cmpx #$600
+    cmpx #$486A
     beq fim
+    stx $0400
     clrb
     lda  #8
     sta c3
@@ -60,18 +58,18 @@ baite:
     bra lop1
 fim:    
     ; no final vamos habilitar IRQ e FIRQ
-    andcc #$a7
-    ; e ligar o motor
-    lda $ff21
-    anda #$f7
-    sta $ff21
+   andcc #$a7
+    ; e desligar o motor
+   lda $ff21
+   anda #$f7
+   sta $ff21
 
     ; para fechar, um loop infinito...
 lp1: 
-     bra lp1    
+     jmp $3000 
      
     ; le um bit, retorna em cc
-    ; preserva a e b, destroi y
+    ; preserva b, destroi a
 lebit:
     pshs b
 
