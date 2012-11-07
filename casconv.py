@@ -1,6 +1,6 @@
 import sys,math
 from itertools import izip_longest, chain
-from struct import pack
+from struct import pack,unpack
 
 onda = [int(127.0 + 127.0 * math.sin(float(k) / 22.0 * math.pi)) for k in range(44)]
 onda_2 = [int(127.0 + 127.0 * math.sin(float(k) / 12.0 * math.pi)) for k in range(24)]
@@ -16,8 +16,61 @@ onda_x = (bytearray(chain.from_iterable([pack("B",n) * 2 for n in onda_3])),
 
 onda_tipos = {True : onda_x, False : onda_bytes}              
               
+NOME_ARQUIVO = 0
+DADOS = 1
+EOF = 15
+              
 def cas_to_wav(arq, modo="wb"):
     return Cas2Wav(arq)
+
+class Cas2Bin(object):
+    def __init__(self, filename="input.cas"):
+        self.__filename = filename
+    
+    @staticmethod    
+    def _read_single_block(inp, header = False):
+        if header: 
+            inp.read(128)
+            
+        assinatura_bloco = e.read(2)
+        if assinatura_bloco != '\x55\x3c':
+            raise Exception("Invalid format")
+
+        tipo,tamanho = unpack("BB", inp.read(2))
+        if tamanho > 0:
+            dados = bytearray(inp.read(tamanho))
+        else:
+            dados = []
+        soma,eob = unpack("BB",inp.read(2))
+
+        if header:
+            inp.read(128)
+        
+        if soma != (tipo + tamanho + sum(dados)) % 256:
+            raise Exception("Invalid checksum")
+        else:
+            return (tipo, dados)
+            
+        
+    def read(self):
+        with open(self.__filename, "rb") as e:
+            tipo, data = Cas2Bin._read_single_block(e, True)
+            if tipo != NOME_ARQUIVO:
+                raise Exception("Invalid format")
+            else:
+                nome = str(data[0:8])
+                subtipo = data[9]
+                binario = data[10] == 0
+                gap = data[11] != 0
+                end_inicial = data[12] * 256 + data[13]
+                end_exec = data[14] * 256 + data[15]
+                
+                dados = []
+                tipo, dt = Cas2Bin._read_single_block(e,False)
+                while tipo != DADOS:
+                    dados += dt
+                    tipo, dt = Cas2Bin._read_single_block(e,False)
+                return (nome, end_inicial, end_exec, dados)
     
 class Cas2Wav(object):
     def __init__(self, filename="cassette.wav"):
@@ -71,12 +124,11 @@ class Bloco(object):
         for d in self.__dados:
             if d != None: soma += d
         soma = soma % 256
-        out.write(bytearray([0x55,0x3C,self.__tipo,self.__tamanho]) + bytearray(self.__dados) + bytearray([soma,0x55]))
-        
-
+        out.write(bytearray([0x55,0x3C,self.__tipo,self.__tamanho]) + bytearray(self.__dados) + bytearray([soma,0x55]))   
+            
 class BlocoArquivo(Bloco):
 #   def __init__(self, tipo, nome, ascii = False, staddr = 0x1F0B, ldaddr = 0x1F0B):
-    def __init__(self, tipo, nome, ascii = False, staddr = 0x2000, ldaddr = 0x2000):
+    def __init__(self, tipo, nome, ascii = False, staddr = 0x600, ldaddr = 0x600):
         Bloco.__init__(self, 0, bytearray(nome.upper()[:8] + " " * (max(0, 8-len(nome)))) + bytearray([tipo, {False: 0, True: 0xFF}[ascii], 0]) + bytearray(pack(">H",staddr)) + bytearray(pack(">H",ldaddr))) 
 
 class BlocoEOF(Bloco):
@@ -90,6 +142,43 @@ def grouper(n, iterable, fillvalue=None):
     args = [iter(iterable)] * n
     return izip_longest(fillvalue=fillvalue, *args)        
 
+def cocotla(target, fn_loader, app, staddr = 0x3000, rnaddr = 0x3000, off_st = 0x2e, off_eof = 0x33, off_rn = 0x55):
+    with open(fn_loader, "rb") as arq:
+        dados = bytearray(arq.read())
+    dados[off_st:off_st+2] = bytearray(pack(">H", staddr))
+    
+    dados[off_rn:off_rn+2] = bytearray(pack(">H", rnaddr))
+        
+    final_addr = staddr + len(app) - 1
+    
+    dados[off_eof:off_eof+2] = bytearray(pack(">H", final_addr))
+    
+    leader = bytearray("U" * 128)
+    l2 = bytearray(range(256)*2)
+    q = len(dados) // 255
+    u  = len(dados) % 255
+
+    nome, ext = target.split(".")
+    with cas_to_wav(target) as s:
+        
+        s.write(leader)
+        BlocoArquivo(2, "CO" + nome.upper()[0:6]).write(s)
+        s.write(leader)
+        if len(dados) < 255:
+            Bloco(1,dados).write(s)
+        else:
+            a = 0
+            for b in grouper(255, dados):        
+                a = a + 1
+                if a == q: b = b[:u]
+                Bloco(1, b).write(s)
+                if a == q: break
+        BlocoEOF().write(s)
+        s.write(app, True)
+        s.write(bytearray([0,0,0]), True)
+        
+    
+    
 if __name__ == "__main__":
     adiciona_teste = False
     if sys.argv[1] == "-w":

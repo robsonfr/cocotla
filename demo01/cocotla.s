@@ -1,4 +1,4 @@
-    org $2000
+    org $600
       
     bra inicio   
     ; rotina para ler os dados
