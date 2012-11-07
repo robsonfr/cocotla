@@ -3,7 +3,7 @@
     bra inicio   
     ; rotina para ler os dados
 c1:
-    db $05
+    db $08
 ;    db $03
 c3:
     db 0
@@ -40,9 +40,11 @@ btt2:
     
     ; x tem o endereco de destino
     ldx    #$3000
+    ;ldx #$400
 lop1:
     stb ,x+
     cmpx #$486A
+    ;cmpx #$600
     beq fim
     stx $0400
     clrb
@@ -66,7 +68,8 @@ fim:
 
     ; para fechar, um loop infinito...
 lp1: 
-     jmp $3000 
+    jmp $3000 
+    bra lp1 
      
     ; le um bit, retorna em cc
     ; preserva b, destroi a

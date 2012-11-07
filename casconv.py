@@ -2,17 +2,17 @@ import sys,math
 from itertools import izip_longest, chain
 from struct import pack
 
-onda = [int(127.0 + 127.0 * math.sin(float(k) / 20.0 * math.pi)) for k in range(40)]
-onda_2 = [int(127.0 + 127.0 * math.sin(float(k) / 11.0 * math.pi)) for k in range(22)]
+onda = [int(127.0 + 127.0 * math.sin(float(k) / 22.0 * math.pi)) for k in range(44)]
+onda_2 = [int(127.0 + 127.0 * math.sin(float(k) / 12.0 * math.pi)) for k in range(24)]
 
 onda_3 = [int(127.0 + 127.0 * math.sin(float(k) / 5.0 * math.pi)) for k in range(10)]
 onda_4 = [int(127.0 + 127.0 * math.sin(float(k) / 3.0 * math.pi)) for k in range(6)]
 
-onda_bytes = (bytearray(chain.from_iterable([pack("B",n) for n in onda])),
-              bytearray(chain.from_iterable([pack("B",n) for n in onda_2])))
+onda_bytes = (bytearray(chain.from_iterable([pack("B",n) * 2 for n in onda])),
+              bytearray(chain.from_iterable([pack("B",n) * 2 for n in onda_2])))
     
-onda_x = (bytearray(chain.from_iterable([pack("B",n)  for n in onda_3])),
-              bytearray(chain.from_iterable([pack("B",n) for n in onda_4])))
+onda_x = (bytearray(chain.from_iterable([pack("B",n) * 2 for n in onda_3])),
+              bytearray(chain.from_iterable([pack("B",n) * 2 for n in onda_4])))
 
 onda_tipos = {True : onda_x, False : onda_bytes}              
               
@@ -30,7 +30,7 @@ class Cas2Wav(object):
         # 0x10,0xB1,0x02,0 : byte rate (taxa * num canais * bits por amostra / 8)
         # 4,0 : alinhamento de bloco (num canais * bits por amostra  / 8)
         # 8,0 : bits por amostra
-        self.__file.write(bytearray("fmt ") + bytearray([16,0,0,0,1,0,1,0, 0x44,0xAC,0,0,0x44,0xAC,0x00,0x00,1,0,8,0]))
+        self.__file.write(bytearray("fmt ") + bytearray([16,0,0,0,1,0,2,0, 0x80,0xBB,0,0,0x00,0x77,0x01,0x00,2,0,8,0]))
         self.__file.write(bytearray("data") + bytearray([0]*4))
         self.__sc2s = 0
         return self
@@ -131,7 +131,7 @@ if __name__ == "__main__":
             with open(outro_arq, "rb") as oa:
                 df = bytearray(oa.read())
             #s.write(bytearray([n for n in range(256)]*2), True)
-            #s.write(bytearray([255] * 512), True)
+            #s.write(bytearray([0] * 512), True)
             s.write(df, True)
             s.write(bytearray([0,0,0]), True)
         
