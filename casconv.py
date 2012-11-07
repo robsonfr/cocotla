@@ -32,7 +32,7 @@ class Cas2Bin(object):
         if header: 
             inp.read(128)
             
-        assinatura_bloco = e.read(2)
+        assinatura_bloco = inp.read(2)
         if assinatura_bloco != '\x55\x3c':
             raise Exception("Invalid format")
 
@@ -40,14 +40,15 @@ class Cas2Bin(object):
         if tamanho > 0:
             dados = bytearray(inp.read(tamanho))
         else:
-            dados = []
-        soma,eob = unpack("BB",inp.read(2))
+            dados = []        
+        soma = unpack("B",inp.read(1))[0]
+        inp.read(1)
 
         if header:
             inp.read(128)
         
         if soma != (tipo + tamanho + sum(dados)) % 256:
-            raise Exception("Invalid checksum")
+            raise Exception("Invalid checksum: %d %d", (soma, (tipo + tamanho + sum(dados)) % 256))
         else:
             return (tipo, dados)
             
@@ -58,16 +59,16 @@ class Cas2Bin(object):
             if tipo != NOME_ARQUIVO:
                 raise Exception("Invalid format")
             else:
-                nome = str(data[0:8])
-                subtipo = data[9]
-                binario = data[10] == 0
-                gap = data[11] != 0
-                end_inicial = data[12] * 256 + data[13]
-                end_exec = data[14] * 256 + data[15]
+                nome = str(data[0:8]).strip()
+                subtipo = data[8]
+                binario = data[9] == 0
+                gap = data[10] != 0
+                end_inicial = data[11] * 256 + data[12]
+                end_exec = data[13] * 256 + data[14]
                 
                 dados = []
                 tipo, dt = Cas2Bin._read_single_block(e,False)
-                while tipo != DADOS:
+                while tipo == DADOS:
                     dados += dt
                     tipo, dt = Cas2Bin._read_single_block(e,False)
                 return (nome, end_inicial, end_exec, dados)

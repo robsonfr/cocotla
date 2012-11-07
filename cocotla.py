@@ -12,6 +12,6 @@ if __name__ == "__main__":
     elif entrada.endswith("cas"):
         cas = Cas2Bin(argv[1])
         nome, inicial, exc, dados = cas.read()
-    cocotla("cocotla_" + nome + ".wav", "cocotla.rom", dados, inicial, exc)
+    cocotla(nome + ".wav", "cocotla.rom", dados, inicial, exc)
     
     
