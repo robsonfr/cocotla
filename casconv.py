@@ -5,8 +5,11 @@ from struct import pack,unpack
 onda = [int(127.0 + 127.0 * math.sin(float(k) / 22.0 * math.pi)) for k in range(44)]
 onda_2 = [int(127.0 + 127.0 * math.sin(float(k) / 12.0 * math.pi)) for k in range(24)]
 
-onda_3 = [int(127.0 + 127.0 * math.sin(float(k) / 5.0 * math.pi)) for k in range(10)]
-onda_4 = [int(127.0 + 127.0 * math.sin(float(k) / 3.0 * math.pi)) for k in range(6)]
+onda_3 = [int(127.0 - 127.0 * math.sin(float(k) / 5.0 * math.pi)) for k in range(10)]
+onda_4 = [int(127.0 - 127.0 * math.sin(float(k) / 3.0 * math.pi)) for k in range(6)]
+
+#onda_3 = [0,255,0,255,0,255,0,255,0];
+#onda_4 = [0,0,0,0,0,255,0,255,0];
 
 onda_bytes = (bytearray(chain.from_iterable([pack("B",n) * 2 for n in onda])),
               bytearray(chain.from_iterable([pack("B",n) * 2 for n in onda_2])))
@@ -29,12 +32,13 @@ class Cas2Bin(object):
     
     @staticmethod    
     def _read_single_block(inp, header = False):
-        if header: 
-            inp.read(128)
-            
-        assinatura_bloco = inp.read(2)
-        if assinatura_bloco != '\x55\x3c':
-            raise Exception("Invalid format")
+        if header:             
+            inp.read(127)
+        i = inp.read(1)
+        while i == 'U': i = inp.read(1)
+        assinatura_bloco = i
+        if assinatura_bloco != '\x3c':
+            raise Exception("Invalid format " + assinatura_bloco)
 
         tipo,tamanho = unpack("BB", inp.read(2))
         if tamanho > 0:
@@ -143,9 +147,10 @@ def grouper(n, iterable, fillvalue=None):
     args = [iter(iterable)] * n
     return izip_longest(fillvalue=fillvalue, *args)        
 
-def cocotla(target, fn_loader, app, staddr = 0x3000, rnaddr = 0x3000, off_st = 0x2e, off_eof = 0x33, off_rn = 0x55):
+def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, off_st = 0x2e, off_eof = 0x33, off_rn = 0x55, off_aj = 0x02):
     with open(fn_loader, "rb") as arq:
         dados = bytearray(arq.read())
+    dados[off_aj] = ajuste
     dados[off_st:off_st+2] = bytearray(pack(">H", staddr))
     
     dados[off_rn:off_rn+2] = bytearray(pack(">H", rnaddr))
@@ -176,7 +181,7 @@ def cocotla(target, fn_loader, app, staddr = 0x3000, rnaddr = 0x3000, off_st = 0
                 if a == q: break
         BlocoEOF().write(s)
         s.write(app, True)
-        s.write(bytearray([0,0,0]), True)
+        s.write(bytearray([app[-1],0,0,0,0,0,0,0,0,0]), True)
         
     
     
@@ -221,7 +226,8 @@ if __name__ == "__main__":
             with open(outro_arq, "rb") as oa:
                 df = bytearray(oa.read())
             #s.write(bytearray([n for n in range(256)]*2), True)
-            #s.write(bytearray([0] * 512), True)
+            #s.write(bytearray([170] * 512), True)
+            #s.write(bytearray(['U','U']), True)
             s.write(df, True)
-            s.write(bytearray([0,0,0]), True)
+            s.write(bytearray([df[-1],0,0,0,0,0,0]), True)
         
