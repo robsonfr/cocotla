@@ -155,7 +155,7 @@ def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, 
     
     dados[off_rn:off_rn+2] = bytearray(pack(">H", rnaddr))
         
-    final_addr = staddr + len(app) - 1
+    final_addr = staddr + len(app)
     
     dados[off_eof:off_eof+2] = bytearray(pack(">H", final_addr))
     
