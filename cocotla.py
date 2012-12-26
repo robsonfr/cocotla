@@ -29,4 +29,3 @@ if __name__ == "__main__":
     cocotla(nome + ".wav", "cocotla.rom", dados, valor, inicial, exc)
     #cocotla(nome + ".wav", "cocot4.rom", dados, valor, inicial, exc)
     
-    

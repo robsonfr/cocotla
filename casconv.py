@@ -291,4 +291,3 @@ if __name__ == "__main__":
                 
             #s.write(df, True)
             #s.write(bytearray([df[-1],0,0,0,0,0,0]), True)
-        

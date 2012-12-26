@@ -97,4 +97,3 @@ alto:
     puls b
     cmpa c1   
     rts           
-   
