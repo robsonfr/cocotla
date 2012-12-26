@@ -1,4 +1,5 @@
 import sys,math
+from io import BytesIO
 from itertools import izip_longest, chain
 from struct import pack,unpack
 
@@ -7,6 +8,10 @@ onda_2 = [int(127.0 + 127.0 * math.sin(float(k) / 12.0 * math.pi)) for k in rang
 
 onda_3 = [int(127.0 - 127.0 * math.sin(float(k) / 5.0 * math.pi)) for k in range(10)]
 onda_4 = [int(127.0 - 127.0 * math.sin(float(k) / 3.0 * math.pi)) for k in range(6)]
+
+#onda_3 = [int(127.0 - 127.0 * math.sin(float(k) / 3.0 * math.pi)) for k in range(6)]
+#onda_4 = [int(127.0 - 127.0 * math.sin(float(k) / 2.0 * math.pi)) for k in range(4)]
+
 
 #onda_3 = [0,255,0,255,0,255,0,255,0];
 #onda_4 = [0,0,0,0,0,255,0,255,0];
@@ -26,6 +31,9 @@ EOF = 15
 def cas_to_wav(arq, modo="wb"):
     return Cas2Wav(arq)
 
+def cas_to_wavmem(arq, modo="wb"):
+    return Cas2WavStream()
+    
 class Cas2Bin(object):
     def __init__(self, filename="input.cas"):
         self.__filename = filename
@@ -78,17 +86,27 @@ class Cas2Bin(object):
                 return (nome, end_inicial, end_exec, dados)
     
 class Cas2Wav(object):
-    def __init__(self, filename="cassette.wav"):
+    def __init__(self, filename="cassette.wav", tem_gap=False, sps=44100, stereo=True, bps=16):
         self.__file = open(filename,"wb")
+        self.__gap = tem_gap
+        self.__samples_per_second = sps
+        self.__stereo = stereo
+        self.__bits_per_sample = bps
                 
     def __enter__(self):
         # Header
         self.__file.write(bytearray("RIFF") + bytearray([0]*4) + bytearray("WAVE"))
-        # 16,0,0,0: tamanho (PCM), 1,0 : formato (PCM), 2,0 : canais, 0x44,0xAC,0,0: taxa de amostragem (44100)
-        # 0x10,0xB1,0x02,0 : byte rate (taxa * num canais * bits por amostra / 8)
-        # 4,0 : alinhamento de bloco (num canais * bits por amostra  / 8)
+        # 16,0,0,0: tamanho (PCM), 1,0 : formato (PCM), 2,0 : canais, 0x80,0xBB,0,0: taxa de amostragem (48000)
+        # 0x00,0x77,0x01,0 : byte rate (taxa * num canais * bits por amostra / 8)
+        # 2,0 : alinhamento de bloco (num canais * bits por amostra  / 8)
         # 8,0 : bits por amostra
-        self.__file.write(bytearray("fmt ") + bytearray([16,0,0,0,1,0,2,0, 0x80,0xBB,0,0,0x00,0x77,0x01,0x00,2,0,8,0]))
+        canais = 1 + self.__stereo
+        taxa = self.__samples_per_second
+        b = self.__bits_per_sample
+        align_block = canais * b / 8
+        byte_rate = taxa * align_block
+        
+        self.__file.write(bytearray("fmt ") + bytearray([16,0,0,0,1,0] + pack("<H<I<I<H<H",canais,taxa,byte_rate,align_block,b)))
         self.__file.write(bytearray("data") + bytearray([0]*4))
         self.__sc2s = 0
         return self
@@ -117,7 +135,19 @@ class Cas2Wav(object):
             self.__file.write(bytearray(pack("I",self.__sc2s)))
         finally:
             self.__file.close()
-
+            
+class Cas2WavStream(Cas2Wav):
+    def __init__(self, stream = None):
+        if stream != None:
+            self.__file = stream
+        else:
+            from io import BytesIO
+            self.__file = BytesIO()
+        
+        @property         
+        def stream():
+            return self.__file
+            
 class Bloco(object):
     def __init__(self, tipo, dados):
         self.__tipo = tipo
@@ -146,10 +176,8 @@ def grouper(n, iterable, fillvalue=None):
     # grouper(3, 'ABCDEFG', 'x') --> ABC DEF Gxx
     args = [iter(iterable)] * n
     return izip_longest(fillvalue=fillvalue, *args)        
-
-def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, off_st = 0x2e, off_eof = 0x33, off_rn = 0x55, off_aj = 0x02):
-    with open(fn_loader, "rb") as arq:
-        dados = bytearray(arq.read())
+   
+def cocotla_loader(output_fn, target, dados, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, off_st = 0x2e, off_eof = 0x33, off_rn = 0x55, off_aj = 0x02):
     dados[off_aj] = ajuste
     dados[off_st:off_st+2] = bytearray(pack(">H", staddr))
     
@@ -165,7 +193,7 @@ def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, 
     u  = len(dados) % 255
 
     nome, ext = target.split(".")
-    with cas_to_wav(target) as s:
+    with output_fn(target) as s:
         
         s.write(leader)
         BlocoArquivo(2, "CO" + nome.upper()[0:6]).write(s)
@@ -183,6 +211,12 @@ def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, 
         s.write(app, True)
         s.write(bytearray([app[-1],0,0,0,0,0,0,0,0,0]), True)
         
+def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, off_st = 0x2e, off_eof = 0x33, off_rn = 0x55, off_aj = 0x02):    
+#def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, off_st = 0x39, off_eof = 0x41, off_rn = 0x6a, off_aj = 0x76):    
+    with open(fn_loader, "rb") as arq:
+        dados = bytearray(arq.read())
+    print "%04X %04X" % (staddr, staddr + len(app))
+    cocotla_loader(cas_to_wav, target, dados, app, ajuste, staddr, rnaddr, off_st, off_eof, off_rn, off_aj)
     
     
 if __name__ == "__main__":
@@ -223,11 +257,38 @@ if __name__ == "__main__":
             #s.llwrite(bytearray([0x01,0x80] * 882))
             #s.write(leader, True)
             #for _ in range(16):
-            with open(outro_arq, "rb") as oa:
-                df = bytearray(oa.read())
+            #s.write(bytearray(['U'] * 2), True)            
+            #with open(outro_arq, "rb") as oa:
+            #    df = bytearray(oa.read())
             #s.write(bytearray([n for n in range(256)]*2), True)
-            #s.write(bytearray([170] * 512), True)
-            #s.write(bytearray(['U','U']), True)
-            s.write(df, True)
-            s.write(bytearray([df[-1],0,0,0,0,0,0]), True)
+            s.write(bytearray([255] * 512), True)
+            s.write(bytearray(['U','U']), True)
+            
+            #novo modo de gravacao:
+            #
+#            q = len(df) // 240
+#            u = len(df) % 240
+#            a = 0
+#            print ""
+#            print u
+#            endereco = 0x3000            
+#            for xb in grouper(240, df):
+#                s.write(bytearray(['\x3c']), True)
+#                a = a + 1
+#                tipo = 1
+#                t = 240
+#                if a == q:
+#                    tipo = 2
+#                    t = u
+#                    xb = xb[:u]
+#                s.write(bytearray([tipo,t] + list(pack(">H", endereco))), True)
+#                s.write(xb, True)
+#                s.write(bytearray([sum(xb) % 255]), True)
+#                s.write(bytearray(['U'] * 2), True)
+#                endereco += t
+#               print t
+#                if a == q: break
+                
+            #s.write(df, True)
+            #s.write(bytearray([df[-1],0,0,0,0,0,0]), True)
         

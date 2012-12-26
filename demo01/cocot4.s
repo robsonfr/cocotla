@@ -2,67 +2,61 @@
       
     bra inicio   
     ; rotina para ler os dados
-c1:
-    db $06
-;    db $03
+c2:
+    db 0
 c3:
     db 0
-nb:
-    db 7
-staddr:
-    dw $3000
-enaddr:
-    dw $486A
-rnaddr:
-    dw $3000
-    
 inicio: 
+    pshs a,b,x,dp
     ; agora vamos desabilitar IRQ e FIRQ...
     orcc #$50
  
+    lda #$ff
+    tfr a,dp
+ 
     ; agora vamos ligar o motor...
-    lda $ff21
+    lda <$21
     ora #$8
-    sta $ff21
-    
+    sta <$21    
     
 lp3:
-    clrb
+    clr c2
     lda #8
     sta c3
 ; tem que ler ateh encontrar algo diferente de 55h
 btte:
     bsr   lebit
-    rorb
+    ror c2
     dec c3
     bne  btte
     cmpb #$55
     beq lp3
 
-    lda nb
+    lda #7
     sta c3
 btt2:
     bsr   lebit
-    rorb
+    ror c2
     dec c3
     bne  btt2
     
     ; x tem o endereco de destino
-    ldx staddr
-    ;ldx #$400
+    ;ldx    #$3000
+    ldx #$400
 lop1:
-    stb ,x+
-    cmpx enaddr
-    ;cmpx #$600
+    ldb c2
+    sta ,x+
+    ;cmpx #$486A
+    cmpx #$600
     beq fim
     stx $0400
-    clrb
+    clr c2
     lda  #8
     sta c3
     ; Le 8 bits para fazer 1 byte
 baite:
     bsr   lebit
-    rorb
+    ror c2
     dec c3
     bne  baite    
     
@@ -71,30 +65,30 @@ fim:
     ; no final vamos habilitar IRQ e FIRQ
    andcc #$a7
     ; e desligar o motor
-   lda $ff21
+   lda <$21
    anda #$f7
-   sta $ff21
+   sta <$21
 
-   ldx rnaddr
-   tfr x,pc
+   puls dp,x,b,a
+    ; para fechar, um loop infinito...
+lp1: 
+    jmp $ac73
+    jmp $3000 
+    ;bra lp1 
      
     ; le um bit, retorna em cc
-    ; preserva b, destroi a
+    ; destroi a e b
 lebit:
-    pshs b
-
+    ldb #1
 baixo:
-    ldb $ff20  ; 4
-    rorb       ; 2
-    bcc baixo
+    bitb <$20  ; 4
+    beq baixo
     
     clra
 alto:
-    ldb  $ff20    ; 4
     inca
-    rorb      ; 2
-    bcs alto ; 3
-    puls b
-    cmpa c1   
+    bitb <$20  ; 4
+    bne alto
+    cmpa #7
     rts           
    

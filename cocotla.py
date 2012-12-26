@@ -17,6 +17,8 @@ if __name__ == "__main__":
     elif entrada.endswith("cas"):
         cas = Cas2Bin(argv[1])
         nome, inicial, exc, dados = cas.read()
+        with open("binario.bin", "wb") as fff:
+            fff.write(bytearray(dados))
     elif entrada.endswith("bin") or entrada.endswith("pak"):
         nome = entrada.split(".")[0].upper()
         with open(argv[1],"rb") as y:
@@ -25,5 +27,6 @@ if __name__ == "__main__":
             exc = inicial
             dados = bytearray(y.read(tamanho))
     cocotla(nome + ".wav", "cocotla.rom", dados, valor, inicial, exc)
+    #cocotla(nome + ".wav", "cocot4.rom", dados, valor, inicial, exc)
     
     
