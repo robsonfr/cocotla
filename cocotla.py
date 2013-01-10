@@ -16,7 +16,7 @@ if __name__ == "__main__":
             dados = bytearray(x.read())        
     elif entrada.endswith("cas"):
         cas = Cas2Bin(argv[1])
-        nome, inicial, exc, dados = cas.read()
+        nome, inicial, exc, dados, gap = cas.read()
         with open("binario.bin", "wb") as fff:
             fff.write(bytearray(dados))
     elif entrada.endswith("bin") or entrada.endswith("pak"):

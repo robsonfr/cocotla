@@ -96,4 +96,5 @@ alto:
     bcs alto ; 3
     puls b
     cmpa c1   
-    rts           
+    rts       
+    
