@@ -4,23 +4,29 @@ from itertools import izip_longest, chain
 from struct import pack,unpack
 
 
-def ondas(zero_one = 0, cocotla = False, bit_length = 8, samples_per_second = 48000, channels = 1):
+def ondas(zero_one = 0, cocotla = False, bit_length = 16, samples_per_second = 48000, channels = 2):
     bits = { 8 : (127,127,"B",1), 16 : (0,32767,"<h",1) }    
-    if cocotla:
-        num_of_samples = (10, 6)
-    else:
-        num_of_samples = (samples_per_second / 1090, samples_per_second / 2000)
     if not bit_length in bits.keys():
         bit_length = 8
     mid_value, factor, fmt, sgn = bits[bit_length]        
 
+    if cocotla:
+        num_of_samples = (4, 8)
+        #sgn = -1        
+        #if bit_length == 16:
+        #    mid_value = bits[bit_length][1]
+        #    fmt = "<H"
+    else:
+        num_of_samples = (samples_per_second / 1090, samples_per_second / 2000)
+    print channels
     nos = num_of_samples[zero_one & 1]
     for k in range(nos):
         for baite in bytearray(pack(fmt, int(mid_value + sgn * factor * math.sin(float(k) / float(nos) * math.pi * 2.0))) * channels):
+        #for baite in bytearray(pack(fmt, int(mid_value + sgn * factor * math.sqrt(1-math.pow(math.cos(float(k) / float(nos) * math.pi * 2.0),2.0)))) * channels):
             yield baite
 
-def pausa(bit_length = 8, samples_per_second = 48000, channels = 1):
-    bits = { 8 : (127,"B"), 16 : (32767,"<H") }
+def pausa(bit_length = 16, samples_per_second = 48000, channels = 2):
+    bits = { 8 : (127,"B"), 16 : (0,"<H") }
     num_of_samples = samples_per_second / 2
     if bit_length in bits.keys():
         mid_value, fmt = bits[bit_length]        
@@ -343,6 +349,7 @@ if __name__ == "__main__":
     with fn(saida,"wb") as s:    
         s.write(leader)
         BlocoArquivo(2,nf).write(s)
+        s.pausa()
         s.write(leader)
         if len(dados) < 255:
             Bloco(1,dados).write(s)
@@ -358,6 +365,6 @@ if __name__ == "__main__":
                 if a == q: break
         BlocoEOF().write(s)
         if adiciona_teste:
-            s.write(bytearray([255] * 512), True)
+            s.write(bytearray([0] * 512), True)
             s.write(bytearray(['U','U']), True)
             
