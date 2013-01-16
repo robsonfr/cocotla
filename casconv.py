@@ -11,14 +11,13 @@ def ondas(zero_one = 0, cocotla = False, bit_length = 16, samples_per_second = 4
     mid_value, factor, fmt, sgn = bits[bit_length]        
 
     if cocotla:
-        num_of_samples = (4, 8)
-        #sgn = -1        
-        #if bit_length == 16:
-        #    mid_value = bits[bit_length][1]
-        #    fmt = "<H"
+        num_of_samples = (10, 6)
+        sgn = -1        
+        if bit_length == 16:
+            mid_value = bits[bit_length][1]
+            fmt = "<H"
     else:
         num_of_samples = (samples_per_second / 1090, samples_per_second / 2000)
-    print channels
     nos = num_of_samples[zero_one & 1]
     for k in range(nos):
         for baite in bytearray(pack(fmt, int(mid_value + sgn * factor * math.sin(float(k) / float(nos) * math.pi * 2.0))) * channels):
@@ -147,9 +146,13 @@ class Cas2Bin(object):
         else:
             return (tipo, dados)
 
-    def read_blocos(self):
+    def read_blocos(self, stream = None):
         blocos_dados = []
-        with open(self.__filename, "rb") as e:
+        if stream:
+            b = stream
+        else:
+            b = open(self.__filename, "rb")
+        with b as e:
             tipo, data = Cas2Bin._read_single_block(e, True)
             if tipo != NOME_ARQUIVO:
                 raise Exception("Invalid format")
@@ -185,18 +188,27 @@ class Cas2Bin(object):
   
     
 class Cas2Wav(object):
-    def __init__(self, filename="cassette.wav", tem_gap=True, sps=44100, stereo=True, bps=16):
-        self.__file = open(filename,"wb")
+    def __init__(self, filename=None, tem_gap=True, sps=44100, stereo=True, bps=16):
+        if filename:
+            self.__file = open(filename,"wb")
         self.__gap = tem_gap
         self.__samples_per_second = sps
         self.__stereo = stereo
         self.__bits_per_sample = bps
+
         self.__onda_tipos = {}
-        print sps, stereo, bps
-        for i in (True,False):
+        for i in (True, False):
             self.__onda_tipos[i] = (bytearray(ondas(0, i, bps, sps, 1 + stereo)),bytearray(ondas(1, i, bps, sps, 1 + stereo)))
         self.__pausa = bytearray(pausa(bps,sps,1+stereo))
-                
+    
+    def set_file(self, file):
+        self.__file = file
+
+    @property         
+    def stream(self):
+        return self.__file
+        
+    
     def __enter__(self):
         # Header
         self.__file.write(bytearray("RIFF") + bytearray([0]*4) + bytearray("WAVE"))
@@ -252,27 +264,28 @@ class Cas2Wav(object):
         for bloco in todos_blocos[1]:
             self.write_bloco(bloco)
         self.write_bloco(BlocoEOF())
-    
+
+    def update(self):
+        self.__file.seek(4)
+        self.__file.write(bytearray(pack("I",self.__sc2s + 36)))
+        self.__file.seek(40)
+        self.__file.write(bytearray(pack("I",self.__sc2s)))
+
     def __exit__(self,type,val,tb):
         try:
-            self.__file.seek(4)
-            self.__file.write(bytearray(pack("I",self.__sc2s + 36)))
-            self.__file.seek(40)
-            self.__file.write(bytearray(pack("I",self.__sc2s)))
+            self.update()
         finally:
             self.__file.close()
             
 class Cas2WavStream(Cas2Wav):
-    def __init__(self, stream = None):
+    def __init__(self, tem_gap=True, sps=44100, stereo=True, bps=16, stream = None):
+        Cas2Wav.__init__(self, None, tem_gap, sps, stereo, bps)        
         if stream != None:
             self.__file = stream
         else:
             from io import BytesIO
             self.__file = BytesIO()
-        
-        @property         
-        def stream():
-            return self.__file
+        Cas2Wav.set_file(self, self.__file)       
         
 
 def grouper(n, iterable, fillvalue=None):
@@ -320,51 +333,6 @@ def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x600, rnaddr = 0x600, of
 #def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, off_st = 0x39, off_eof = 0x41, off_rn = 0x6a, off_aj = 0x76):    
     with open(fn_loader, "rb") as arq:
         dados = bytearray(arq.read())
-    print "%04X %04X" % (staddr, staddr + len(app))
     cocotla_loader(cas_to_wav, target, dados, app, ajuste, staddr, rnaddr, off_st, off_eof, off_rn, off_aj)
     
     
-if __name__ == "__main__":
-    adiciona_teste = False
-    if sys.argv[1] == "-w":
-        nome = sys.argv[2]
-        fn = cas_to_wav
-        saida = nome.replace(".rom",".wav")
-        adiciona_teste = True
-        outro_arq = sys.argv[3]
-    else:
-        nome = sys.argv[1]
-        fn = open
-        saida = nome.replace(".rom",".cas")      
-        
-    nf = nome.replace(".rom","")
-    with open(nome,"rb") as arq:
-        dados = bytearray(arq.read())  
-    leader = bytearray("U" * 128)
-    l2 = bytearray(range(256)*2)
-    q = len(dados) // 255 + 1
-    u  = len(dados) % 255
-    print q,u
-    llx = len(dados)
-    with fn(saida,"wb") as s:    
-        s.write(leader)
-        BlocoArquivo(2,nf).write(s)
-        s.pausa()
-        s.write(leader)
-        if len(dados) < 255:
-            Bloco(1,dados).write(s)
-        else:
-            a = 0
-            r = 0
-            for b in grouper(255, dados):        
-                a = a + 1
-                if a == q: b = b[:u]
-                r = r + len(b)
-                print len(b), r, llx
-                Bloco(1, b).write(s)
-                if a == q: break
-        BlocoEOF().write(s)
-        if adiciona_teste:
-            s.write(bytearray([0] * 512), True)
-            s.write(bytearray(['U','U']), True)
-            
