@@ -4,7 +4,7 @@ from itertools import izip_longest, chain
 from struct import pack,unpack
 
 
-def ondas(zero_one = 0, cocotla = False, bit_length = 16, samples_per_second = 48000, channels = 2):
+def ondas(zero_one = 0, cocotla = False, bit_length = 8, samples_per_second = 44100, channels = 2):
     bits = { 8 : (127,127,"B",1), 16 : (0,32767,"<h",1) }    
     if not bit_length in bits.keys():
         bit_length = 8
@@ -24,7 +24,7 @@ def ondas(zero_one = 0, cocotla = False, bit_length = 16, samples_per_second = 4
         #for baite in bytearray(pack(fmt, int(mid_value + sgn * factor * math.sqrt(1-math.pow(math.cos(float(k) / float(nos) * math.pi * 2.0),2.0)))) * channels):
             yield baite
 
-def pausa(bit_length = 16, samples_per_second = 48000, channels = 2):
+def pausa(bit_length = 8, samples_per_second = 44100, channels = 1):
     bits = { 8 : (127,"B"), 16 : (0,"<H") }
     num_of_samples = samples_per_second / 2
     if bit_length in bits.keys():
@@ -115,6 +115,12 @@ def cas_to_wav(arq, modo="wb"):
 
 def cas_to_wavmem(arq, modo="wb"):
     return Cas2WavStream()
+
+def dados_bin(dados, st=0xC000, rn=0xC000, exc = True):
+    ret = bytearray([0] + list(pack(">HH", len(dados), st)) + dados)
+    if exc:
+        ret = ret + bytearray([255] + list(pack(">HH", 0, rn)))
+    return ret
     
 class Cas2Bin(object):
     def __init__(self, filename="input.cas"):
@@ -188,7 +194,7 @@ class Cas2Bin(object):
   
     
 class Cas2Wav(object):
-    def __init__(self, filename=None, tem_gap=True, sps=44100, stereo=True, bps=16):
+    def __init__(self, filename=None, tem_gap=True, sps=44100, stereo=False, bps=8):
         if filename:
             self.__file = open(filename,"wb")
         self.__gap = tem_gap
@@ -197,8 +203,9 @@ class Cas2Wav(object):
         self.__bits_per_sample = bps
 
         self.__onda_tipos = {}
-        for i in (True, False):
+        for i in (False,):
             self.__onda_tipos[i] = (bytearray(ondas(0, i, bps, sps, 1 + stereo)),bytearray(ondas(1, i, bps, sps, 1 + stereo)))
+        self.__onda_tipos[True] = onda_x
         self.__pausa = bytearray(pausa(bps,sps,1+stereo))
     
     def set_file(self, file):
@@ -278,7 +285,7 @@ class Cas2Wav(object):
             self.__file.close()
             
 class Cas2WavStream(Cas2Wav):
-    def __init__(self, tem_gap=True, sps=44100, stereo=True, bps=16, stream = None):
+    def __init__(self, tem_gap=True, sps=44100, stereo=False, bps=8, stream = None):
         Cas2Wav.__init__(self, None, tem_gap, sps, stereo, bps)        
         if stream != None:
             self.__file = stream
@@ -294,7 +301,7 @@ def grouper(n, iterable, fillvalue=None):
     args = [iter(iterable)] * n
     return izip_longest(fillvalue=fillvalue, *args)        
    
-def cocotla_loader(output_fn, target, dados, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, off_st = 0x2e, off_eof = 0x33, off_rn = 0x55, off_aj = 0x02):
+def cocotla_loader(output_fn, target, dados, app, ajuste=6, staddr = 0x3000, rnaddr = 0x3000, off_st = 0x05, off_eof = 0x07, off_rn = 0x09, off_aj = 0x02):
     dados[off_aj] = ajuste
     dados[off_st:off_st+2] = bytearray(pack(">H", staddr))
     
@@ -334,5 +341,30 @@ def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x600, rnaddr = 0x600, of
     with open(fn_loader, "rb") as arq:
         dados = bytearray(arq.read())
     cocotla_loader(cas_to_wav, target, dados, app, ajuste, staddr, rnaddr, off_st, off_eof, off_rn, off_aj)
+
+def blocos_binario(nome, dados):
+    dd = []
+    buffer = []
+    for b in dados:
+        l = len(buffer)
+        if l > 0 and len(buffer) % 255 == 0:
+            dd.append(Bloco(DADOS, buffer))
+            buffer = []
+        buffer.append(b)
+    if l > 0 == 0:
+        dd.append(Bloco(DADOS, buffer))
+    return (BlocoArquivo(2, nome, False, 0x3000, 0x3000), dd)
     
-    
+if __name__ == "__main__":
+    entrada = sys.argv[1]
+    with open(entrada,"rb") as e:
+        dados = bytearray(e.read())
+    nome_saida = entrada.replace(".rom", ".cas")
+    bl = blocos_binario(entrada.replace(".","-").upper(),  dados)
+    with open(nome_saida,"wb") as saida:
+        saida.write(bytearray('U' * 128))
+        bl[0].write(saida)
+        saida.write(bytearray('U' * 128))
+        for bloco in bl[1]:
+            bloco.write(saida)            
+        BlocoEOF().write(saida)

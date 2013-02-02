@@ -1,10 +1,11 @@
 import sys
 from getopt import getopt as g
-from casconv import Cas2Wav, Cas2Bin
+from casconv import Cas2Wav, Cas2Bin, blocos_binario, BlocoEOF
 
 def sintaxe():
-    print "Sintaxe: cas2wav [-h | --help] [-g | --gap] [-f sps,bits,c | --format sps,bits,c] arquivo_entrada [arquivo_saida]"
+    print "Sintaxe: cas2wav [-h | --help] [-c | --cas] [-g | --gap] [-f sps,bits,c | --format sps,bits,c] arquivo_entrada [arquivo_saida]"
     print "    -h , --help   : esta mensagem de ajuda"
+    print "    -c , --cas    : grava um arquivo .cas ao inves de um .wav"
     print "    -g , --gap    : coloca o gap de 1/2 segundo depois do header do nome do arquivo"
     print "    -f , --format : define o formato do arquivo de saida "
     print "                   (sps = amostras por segundo, bits = bits por amostra e c=canais (1 ou 2)"
@@ -13,7 +14,7 @@ def sintaxe():
 if len(sys.argv) < 2:
     sintaxe()
 
-parametros, extras = g(sys.argv[1:],"hgf:",["help", "gap","format"])
+parametros, extras = g(sys.argv[1:],"hcgf:",["help", "cas", "gap","format"])
 
 if len(extras) < 1:
     sintaxe()
@@ -22,14 +23,17 @@ nome_entrada = extras.pop(0)
 if len(extras) == 1:
     nome_saida = extras.pop()
 else:
-    nome_saida = nome_entrada.lower().replace(".cas",".wav")
+    nome_saida = ".".join(nome_entrada.lower().split(".")[:-1] + ["wav"])
 
 
 gap, sps, bits, chan = False, 44100, 8, 1
     
+cas = False    
 for p,v in parametros:
     if p == "-h":
         sintaxe()
+    if p == "-c" or p == "--cas":
+        cas = True
     if p == "-g" or p == "--gap":
         gap = True
     if p == "-f" or p == "--format":
@@ -38,10 +42,29 @@ for p,v in parametros:
             sintaxe()
         else:
             sps, bits, chan = (int(k) for k in dados)
-    
 
-todos_blocos = Cas2Bin(nome_entrada).read_blocos()
+if nome_entrada.endswith("rom"):
+    with open(nome_entrada,"rb") as inp:
+        dados = bytearray(inp.read())
+    todos_blocos = blocos_binario(nome_entrada.replace(".","-").upper(), dados)            
 
-with Cas2Wav(nome_saida, tem_gap = gap, sps = sps, stereo = (chan == 2), bps = bits) as saida:
-    saida.write_todos_blocos(todos_blocos)
+if not cas:                      
+           
+    if nome_entrada.endswith("cas"):
+        todos_blocos = Cas2Bin(nome_entrada).read_blocos()
 
+    with Cas2Wav(nome_saida, tem_gap = gap, sps = sps, stereo = (chan == 2), bps = bits) as saida:
+        saida.write_todos_blocos(todos_blocos)
+else:
+    if nome_entrada.endswith("cas"):
+        print "O arquivo jah eh cas"
+        sys.exit()
+    else:
+        nome_saida = ".".join(nome_entrada.lower().split(".")[:-1] + ["cas"])
+        with open(nome_saida, "wb") as saida:
+            saida.write(bytearray('U' * 128))
+            todos_blocos[0].write(saida)
+            saida.write(bytearray('U' * 128))
+            for bloco in todos_blocos[1]:
+                bloco.write(saida)
+            BlocoEOF().write(saida)
