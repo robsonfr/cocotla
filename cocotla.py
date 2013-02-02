@@ -10,8 +10,8 @@ if __name__ == "__main__":
         valor = 6
     if entrada.endswith("rom"):
         nome = entrada.split(".")[0].upper()
-        inicial = 0x600
-        exc = 0x600
+        inicial = 0x3000
+        exc = 0x3000
         with open(argv[1],"rb") as x:
             dados = bytearray(x.read())        
     elif entrada.endswith("cas"):
