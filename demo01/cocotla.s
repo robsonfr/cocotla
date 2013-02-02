@@ -20,6 +20,9 @@ inicio:
     ; agora vamos desabilitar IRQ e FIRQ...
     orcc #$50
  
+    ; vamos habilitar full-ram para jogos em cartucho...
+    sta $ffdf
+ 
     ; agora vamos ligar o motor...
     lda $ff21
     ora #$8
