@@ -185,7 +185,7 @@ class Cas2Bin(object):
   
     
 class Cas2Wav(object):
-    def __init__(self, filename="cassette.wav", tem_gap=True, sps=44100, stereo=True, bps=16):
+    def __init__(self, filename="cassette.wav", tem_gap=True, sps=48000, stereo=True, bps=8):
         self.__file = open(filename,"wb")
         self.__gap = tem_gap
         self.__samples_per_second = sps
@@ -193,8 +193,9 @@ class Cas2Wav(object):
         self.__bits_per_sample = bps
         self.__onda_tipos = {}
         print sps, stereo, bps
-        for i in (True,False):
-            self.__onda_tipos[i] = (bytearray(ondas(0, i, bps, sps, 1 + stereo)),bytearray(ondas(1, i, bps, sps, 1 + stereo)))
+        i = False
+        self.__onda_tipos[False] = (bytearray(ondas(0, i, bps, sps, 1 + stereo)),bytearray(ondas(1, i, bps, sps, 1 + stereo)))
+        self.__onda_tipos[True]  = onda_x
         self.__pausa = bytearray(pausa(bps,sps,1+stereo))
                 
     def __enter__(self):
@@ -349,7 +350,8 @@ if __name__ == "__main__":
     with fn(saida,"wb") as s:    
         s.write(leader)
         BlocoArquivo(2,nf).write(s)
-        s.pausa()
+        if "pausa" in dir(s):
+            s.pausa()
         s.write(leader)
         if len(dados) < 255:
             Bloco(1,dados).write(s)
