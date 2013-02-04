@@ -368,4 +368,3 @@ if __name__ == "__main__":
         for bloco in bl[1]:
             bloco.write(saida)            
         BlocoEOF().write(saida)
->>>>>>> 57912eba5c0bd930bd9542470075ab3ea5fa25a4
