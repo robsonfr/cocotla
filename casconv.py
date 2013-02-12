@@ -2,7 +2,7 @@ import sys,math
 from io import BytesIO
 from itertools import izip_longest, chain
 from struct import pack,unpack
-
+from wave import WaveFile, pausa
 
 def ondas(zero_one = 0, cocotla = False, bit_length = 8, samples_per_second = 44100, channels = 2):
     bits = { 8 : (127,127,"B",1), 16 : (0,32767,"<h",1) }    
@@ -22,18 +22,7 @@ def ondas(zero_one = 0, cocotla = False, bit_length = 8, samples_per_second = 44
     for k in range(nos):
         for baite in bytearray(pack(fmt, int(mid_value + sgn * factor * math.sin(float(k) / float(nos) * math.pi * 2.0))) * channels):
         #for baite in bytearray(pack(fmt, int(mid_value + sgn * factor * math.sqrt(1-math.pow(math.cos(float(k) / float(nos) * math.pi * 2.0),2.0)))) * channels):
-            yield baite
-
-def pausa(bit_length = 8, samples_per_second = 44100, channels = 1):
-    bits = { 8 : (127,"B"), 16 : (0,"<H") }
-    num_of_samples = samples_per_second / 2
-    if bit_length in bits.keys():
-        mid_value, fmt = bits[bit_length]        
-    else:
-        mid_value, fmt = bits[8]
-    for baite in bytearray(pack(fmt, int(mid_value)) * channels * num_of_samples):
-        yield baite
-    
+            yield baite    
 
 onda = [int(127.0 + 127.0 * math.sin(float(k) / 22.0 * math.pi)) for k in range(44)]
 onda_2 = [int(127.0 + 127.0 * math.sin(float(k) / 12.0 * math.pi)) for k in range(24)]
@@ -89,7 +78,7 @@ class Bloco(object):
             
 class BlocoArquivo(Bloco):
 #   def __init__(self, tipo, nome, ascii = False, staddr = 0x1F0B, ldaddr = 0x1F0B):
-    def __init__(self, tipo, nome, ascii = False, staddr = 0x3000, ldaddr = 0x3000):
+    def __init__(self, tipo, nome, ascii = False, staddr = 0x1600, ldaddr = 0x1600):
         Bloco.__init__(self, 0, bytearray(nome.upper()[:8] + " " * (max(0, 8-len(nome)))) + bytearray([tipo, {False: 0, True: 0xFF}[ascii], 0]) + bytearray(pack(">H",staddr)) + bytearray(pack(">H",ldaddr))) 
         self.__pausa = True
         
@@ -117,7 +106,7 @@ def cas_to_wavmem(arq, modo="wb"):
     return Cas2WavStream()
 
 def dados_bin(dados, st=0xC000, rn=0xC000, exc = True):
-    ret = bytearray([0] + list(pack(">HH", len(dados), st)) + dados)
+    ret = bytearray([0] + list(pack(">HH", len(dados), st)) + list(dados))
     if exc:
         ret = ret + bytearray([255] + list(pack(">HH", 0, rn)))
     return ret
@@ -193,56 +182,14 @@ class Cas2Bin(object):
                 return (nome, end_inicial, end_exec, dados, gap)
   
     
-class Cas2Wav(object):
+class Cas2Wav(WaveFile):
     def __init__(self, filename=None, tem_gap=True, sps=44100, stereo=False, bps=8):
-        if filename:
-            self.__file = open(filename,"wb")
-        self.__gap = tem_gap
-        self.__samples_per_second = sps
-        self.__stereo = stereo
-        self.__bits_per_sample = bps
+        WaveFile.__init__(self, filename, tem_gap, sps, stereo, bps)
 
         self.__onda_tipos = {}
         for i in (False,):
             self.__onda_tipos[i] = (bytearray(ondas(0, i, bps, sps, 1 + stereo)),bytearray(ondas(1, i, bps, sps, 1 + stereo)))
         self.__onda_tipos[True] = onda_x
-        self.__pausa = bytearray(pausa(bps,sps,1+stereo))
-    
-    def set_file(self, file):
-        self.__file = file
-
-    @property         
-    def stream(self):
-        return self.__file
-        
-    
-    def __enter__(self):
-        # Header
-        self.__file.write(bytearray("RIFF") + bytearray([0]*4) + bytearray("WAVE"))
-        # 16,0,0,0: tamanho (PCM), 1,0 : formato (PCM), 2,0 : canais, 0x80,0xBB,0,0: taxa de amostragem (48000)
-        # 0x00,0x77,0x01,0 : byte rate (taxa * num canais * bits por amostra / 8)
-        # 2,0 : alinhamento de bloco (num canais * bits por amostra  / 8)
-        # 8,0 : bits por amostra
-        canais = 1 + self.__stereo
-        taxa = self.__samples_per_second
-        b = self.__bits_per_sample
-        align_block = canais * b / 8
-        byte_rate = taxa * align_block
-        
-        self.__file.write(bytearray("fmt "))
-        self.__file.write(bytearray([16,0,0,0,1,0]))
-        self.__file.write(bytearray(pack("<HIIHH",canais,taxa,byte_rate,align_block,b)))
-        self.__file.write(bytearray("data") + bytearray([0]*4))
-        self.__sc2s = 0
-        return self    
-        
-        
-    def llwrite(self, data):
-        self.__sc2s += len(data)
-        self.__file.write(data)           
-        
-    def pausa(self):
-        self.llwrite(self.__pausa)
               
     def write(self, data, velocidade=False):
         oo = self.__onda_tipos[velocidade]
@@ -265,34 +212,23 @@ class Cas2Wav(object):
     def write_todos_blocos(self, todos_blocos):
         self.write_leader()
         self.write_bloco(todos_blocos[0])
-        if self.__gap: 
+        if self._gap: 
             self.pausa()
         self.write_leader()
         for bloco in todos_blocos[1]:
             self.write_bloco(bloco)
         self.write_bloco(BlocoEOF())
 
-    def update(self):
-        self.__file.seek(4)
-        self.__file.write(bytearray(pack("I",self.__sc2s + 36)))
-        self.__file.seek(40)
-        self.__file.write(bytearray(pack("I",self.__sc2s)))
-
-    def __exit__(self,type,val,tb):
-        try:
-            self.update()
-        finally:
-            self.__file.close()
             
 class Cas2WavStream(Cas2Wav):
     def __init__(self, tem_gap=True, sps=44100, stereo=False, bps=8, stream = None):
         Cas2Wav.__init__(self, None, tem_gap, sps, stereo, bps)        
         if stream != None:
-            self.__file = stream
+            self._file = stream
         else:
             from io import BytesIO
-            self.__file = BytesIO()
-        Cas2Wav.set_file(self, self.__file)       
+            self._file = BytesIO()
+        #Cas2Wav.set_file(self, self.__file)       
         
 
 def grouper(n, iterable, fillvalue=None):
@@ -353,7 +289,7 @@ def blocos_binario(nome, dados):
         buffer.append(b)
     if l > 0 == 0:
         dd.append(Bloco(DADOS, buffer))
-    return (BlocoArquivo(2, nome, False, 0x3000, 0x3000), dd)
+    return (BlocoArquivo(2, nome, False, 0x1600, 0x1600), dd)
     
 if __name__ == "__main__":
     entrada = sys.argv[1]
