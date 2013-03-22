@@ -54,7 +54,9 @@ tecl:
     
     ; a ideia eh ler os tempos de altos e baixos e escreve-los na tela...
 	; b guarda o contador
-ciclo:	
+ciclo:
+    jsr [$a000]
+    bne sair
 	clr contador
 	inc contador
 prox:		
@@ -66,10 +68,12 @@ prox:
 	bne prox
 	
 	; estouro...	
-	ldb a,y
-	stb, x+
+;	ldb a,y
+;	stb, x+
 	ldb 16,y	
 	stb, x+
+    ldb #$60
+    stb, x+
 ;	stb, x+
 	bra fiml
 	
@@ -80,7 +84,7 @@ exibir:
 	cmpb #2
 	beq ciclo
 	tfr b,a
-	bsr nibble
+;	bsr nibble
 	
 ;	lda contador
 ;	lsra
@@ -91,6 +95,8 @@ exibir:
 	
 	lda contador
 	bsr nibble
+    lda #$60
+    sta, x+
 	bra fiml
 	
 nibble:	
@@ -104,7 +110,10 @@ fiml:
 ;	stb, x+
 	cmpx #$600
 	blo ciclo
-	
+	ldx #$400
+    bra ciclo
+
+sair:
     lda <$21
     anda #$F7
     sta <$21
@@ -114,8 +123,9 @@ fiml:
 	
 	andcc #$AF
 tecl2:	
-	jsr [$a000]
-	beq tecl2
+;	jsr [$a000]
+;	beq tecl2
+
 	puls dp,y,x,b,a
     jmp $ac73
 	
