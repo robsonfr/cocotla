@@ -278,7 +278,7 @@ def cocotla(target, fn_loader, app, ajuste=6, staddr = 0x600, rnaddr = 0x600, of
         dados = bytearray(arq.read())
     cocotla_loader(cas_to_wav, target, dados, app, ajuste, staddr, rnaddr, off_st, off_eof, off_rn, off_aj)
 
-def blocos_binario(nome, dados):
+def blocos_binario(nome, dados, st_addr = 0x1600, rn_addr = 0x1600):
     dd = []
     buffer = []
     for b in dados:
@@ -289,7 +289,7 @@ def blocos_binario(nome, dados):
         buffer.append(b)
     if l > 0 == 0:
         dd.append(Bloco(DADOS, buffer))
-    return (BlocoArquivo(2, nome, False, 0x1600, 0x1600), dd)
+    return (BlocoArquivo(2, nome, False, st_addr, rn_addr), dd)
     
 if __name__ == "__main__":
     entrada = sys.argv[1]

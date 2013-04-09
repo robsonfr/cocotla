@@ -1,6 +1,6 @@
 import sys
 from getopt import getopt as g
-from casconv import Cas2Wav, Cas2Bin, blocos_binario, BlocoEOF
+from casconv import Cas2Wav, Cas2Bin, blocos_binario, BlocoEOF, BlocoArquivo
 
 def sintaxe():
     print "Sintaxe: cas2wav [-h | --help] [-c | --cas] [-g | --gap] [-f sps,bits,c | --format sps,bits,c] arquivo_entrada [arquivo_saida]"
@@ -47,6 +47,14 @@ if nome_entrada.endswith("rom"):
     with open(nome_entrada,"rb") as inp:
         dados = bytearray(inp.read())
     todos_blocos = blocos_binario(nome_entrada.replace(".","-").upper(), dados)            
+elif nome_entrada.endswith("bin"):
+    with open(nome_entrada,"rb") as inp:
+        bin_dados = bytearray(inp.read())    
+    tam_bin = int(bin_dados[1]) * 256 + int(bin_dados[2])
+    end_inicial = int(bin_dados[3] * 256) + int(bin_dados[4])
+    dados = bin_dados[5:tam_bin+5]
+    end_exec = int(bin_dados[tam_bin+8] * 256) + int(bin_dados[tam_bin+9])
+    todos_blocos = blocos_binario(nome_entrada.replace(".","-").upper(), dados, end_inicial, end_exec)
 
 if not cas:                      
            

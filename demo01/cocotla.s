@@ -17,17 +17,19 @@ rnaddr:
     dw $3000
     
 inicio: 
-    ; agora vamos desabilitar IRQ e FIRQ...
+	; agora vamos desabilitar IRQ e FIRQ...
     orcc #$50
- 
-    ; vamos habilitar full-ram para jogos em cartucho...
-    sta $ffdf
+	
+	lda #$ff
+	tfr a,dp
+    
+	; vamos habilitar full-ram para jogos em cartucho...
+    sta <$df
  
     ; agora vamos ligar o motor...
-    lda $ff21
+    lda <$21
     ora #$8
-    sta $ff21
-    
+    sta <$21    
     
 lp3:
     clrb
@@ -74,9 +76,9 @@ fim:
     ; no final vamos habilitar IRQ e FIRQ
    andcc #$a7
     ; e desligar o motor
-   lda $ff21
+   lda $<21
    anda #$f7
-   sta $ff21
+   sta $<21
 
    ldx rnaddr
    tfr x,pc
@@ -87,13 +89,13 @@ lebit:
     pshs b
 
 baixo:
-    ldb $ff20  ; 4
+    ldb <$20  ; 4
     rorb       ; 2
     bcc baixo
     
     clra
 alto:
-    ldb  $ff20    ; 4
+    ldb  <$20    ; 4
     inca
     rorb      ; 2
     bcs alto ; 3
