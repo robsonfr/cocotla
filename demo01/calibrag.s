@@ -4,13 +4,16 @@
 	
 valores:
 	db 0
+
+soma:
+	dw 0
 	
 main:
 	orcc #$50     ; desabilita interrupcoes
 	lda #$ff      
 	tfr a,dp
 	leay [valores]
-	ldx #$3000
+	ldx #$400
 	
 	ldb <$21   
 	orb #$8       ; liga o motor
@@ -29,12 +32,12 @@ lzero:
 	ldb <$20	
 	rorb
 	bcc lzero	
-	cmpa #10
-	ror ,x
+	sta, x+
+	; ror ,x
+	; nop
 	dec valores
 	bne loop
-	leax 1,x
-	cmpx #$4900
+	cmpx #$5F8
 	bne baite
 	ldx #$400
 	bra baite
